@@ -52,7 +52,10 @@ class AudioDataset(Dataset):
 
     def __len__(self) -> int:
         return len(self.records)
-
+        
+    def _is_labeled(self, is_labeled: str)-> int:
+        return 1 if is_labeled.lower()=="yes" else 0
+		    
     def _get_prompt_tokens(self, prompt: str) -> List[int]:
         if len(prompt) > 0 and torch.rand(1) < self.prompt_use_rate:
             prompt_tokens = self._encode_text_with_timestamps(prompt)[-self.max_prompt_length :]
@@ -179,11 +182,12 @@ class AudioDataset(Dataset):
             mel,
             torch.tensor(decoder_input, dtype=torch.long),
             torch.tensor(decoder_output, dtype=torch.long),
+            torch.tensor(self._is_labeled(record.is_labeled), dtype=torch.long)
         )
 
 
     def collate_fn(self, data):
-        x, y_in, y_out = zip(*data)
+        x, y_in, y_out, is_labeled = zip(*data)
         x = pad_sequence(x, batch_first=True, padding_value=0)
         
         if self.specaug:
@@ -192,7 +196,8 @@ class AudioDataset(Dataset):
         x = x.half()
         y_in = pad_sequence(y_in, batch_first=True, padding_value=0)
         y_out = pad_sequence(y_out, batch_first=True, padding_value=-100)
-        return x, y_in, y_out
+        is_labeled = torch.stack(is_labeled)
+        return x, y_in, y_out, is_labeled
 
 
 class WhisperDataModule(pl.LightningDataModule):

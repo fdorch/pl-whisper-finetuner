@@ -125,6 +125,7 @@ def get_parser() -> argparse.ArgumentParser:
 DURATION = 30000  # 30 seconds in milliseconds
 SAMPLE_RATE = 16000
 DURATION_IN_SAMPLES = int(DURATION * SAMPLE_RATE / 1000)
+PSEUDO_LABELED_DIR="/ERR/etv_korpus_audio/media"
 
 
 @dataclass
@@ -151,6 +152,7 @@ class Record:
     language: str = "en"
     task: str = "transcribe"
     prompt: str = ""  # previous text including timestamps
+    is_labeled: str = "yes"
 
 
 @dataclass
@@ -245,6 +247,11 @@ class DataProcessor:
                 audio_path, transcript_path = line.strip().split()          
                 audio_path = Path(audio_path)
                 speech_id = Path(audio_path).stem
+                is_labeled = True
+                
+                if PSEUDO_LABELED_DIR in str(audio_path):
+                    is_labeled = False
+                
                 if transcript_path.endswith(".srt"):
                     try:
                         utterances_for_speech = self.read_utterances_from_srt(
@@ -268,6 +275,9 @@ class DataProcessor:
                     continue
 
                 records = self._create_records_with_timestamps(utterances_for_speech, audio_path)
+                for record in records:
+                    if not is_labeled:
+                        record.is_labeled = "no"
                 self.write_records(records, self.output)
 
     @staticmethod
@@ -543,6 +553,8 @@ class DataProcessor:
                     language=data["language"],
                     task=data["task"],
                     prompt=data["prompt"],
+                    is_labeled=data["is_labeled"]
+                    
                 )
                 records.append(record)
         return records
@@ -557,6 +569,7 @@ class DataProcessor:
                     "language": record.language,
                     "task": record.task,
                     "prompt": record.prompt,
+                    "is_labeled": record.is_labeled
                 }
                 f.write(json.dumps(data, ensure_ascii=False) + "\n")
 

@@ -15,7 +15,9 @@ class LitWhisper(L.LightningModule):
         lr:float = 1e-4,
         weight_decay: float = 0.00,
         warmup_steps: int = 500,
-        optimizer_name: str = "adam",        
+        optimizer_name: str = "adam",
+        labeled_w: float = 1.0,
+        pseudo_labeled_w: float = 0.1
         *args, **kwargs
     ):
         super().__init__()
@@ -23,12 +25,20 @@ class LitWhisper(L.LightningModule):
         self.model = whisper.load_model(self.hparams.model, device=self.device)
         del self.model.alignment_heads
 
-    def model_step(self, batch, batch_idx, name):
-        x, y_in, y_out = batch
+    def model_step(self, batch, batch_idx, name, labeled_w, pseudo_labeled_w):
+        x, y_in, y_out, is_labeled = batch
         x, y_in, y_out = x.to(self.device), y_in.to(self.device), y_out.to(self.device)
         audio_features = self.model.embed_audio(x)
         logits = self.model.logits(y_in, audio_features=audio_features)
-        loss = F.cross_entropy(logits.transpose(1, 2), y_out)        
+        
+        labeled_idx = is_labeled == 1
+        pseudo_labeled_idx = is_labeled == 0
+        
+        labeled_loss = F.cross_entropy(logits[labeled_idx].transpose(1, 2), y_out[labeled_idx], ignore_index=-100) if labeled_idx.any() else 0
+        pseudo_labeled_loss = F.cross_entropy(logits[pseudo_labeled_idx].transpose(1, 2), y_out[pseudo_labeled_idx], ignore_index=-100) if pseudo_labeled_idx.any() else 0
+
+        loss = (labeled_w * labeled_loss) + (pseudo_labeled_w * pseudo_labeled_loss)
+		
         self.log(f"{name}_loss", loss, prog_bar=True, sync_dist=True)                
         return loss        
 
