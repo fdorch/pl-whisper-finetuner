@@ -6,7 +6,6 @@ import torch.nn.functional as F
 
 from transformers import get_linear_schedule_with_warmup
 import whisper
-
 import lightning as L
 
 class LitWhisper(L.LightningModule):
@@ -17,7 +16,7 @@ class LitWhisper(L.LightningModule):
         warmup_steps: int = 500,
         optimizer_name: str = "adam",
         labeled_w: float = 1.0,
-        pseudo_labeled_w: float = 0.1
+        pseudo_labeled_w: float = 0.1,
         *args, **kwargs
     ):
         super().__init__()
@@ -75,6 +74,4 @@ class LitWhisper(L.LightningModule):
             num_training_steps=self.trainer.estimated_stepping_batches
         )
         return [optimizer], [scheduler]
-
-
 
